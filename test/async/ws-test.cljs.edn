@@ -1,0 +1,3 @@
+{:require          [async.ws-test]
+ :init-fns         [async.ws-test/init]
+ :compiler-options {:language-out :ecmascript5}}
