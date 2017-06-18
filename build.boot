@@ -9,6 +9,8 @@
                  [weasel                    "0.7.0"  :scope "test"]
                  [aleph                     "0.4.3"  :scope "test"]
 
+                 [adzerk/bootlaces          "0.1.13" :scope "test"]
+
                  [org.clojure/clojure        "1.9.0-alpha16" :scope "provide"]
                  [org.clojure/clojurescript  "1.9.562"       :scope "provide"]
                  [org.clojure/core.async     "0.3.443"       :scope "provide"]])
@@ -17,7 +19,19 @@
  '[adzerk.boot-cljs      :refer [cljs]]
  '[adzerk.boot-cljs-repl :refer [cljs-repl start-repl]]
  '[adzerk.boot-reload    :refer [reload]]
- '[pandeiro.boot-http    :refer [serve]])
+ '[pandeiro.boot-http    :refer [serve]]
+ '[adzerk.bootlaces      :refer :all])
+
+(def +version+ "0.1.0")
+
+(bootlaces! +version+)
+
+(task-options!
+ pom  {:project 'async-ws
+       :version +version+
+       :url     "https://github.com/gfZeng/time.clj"
+       :scm     {:url "https://github.com/gfZeng/time.clj"}
+       :license {"Eclipse Public License" "http://www.eclipse.org/legal/epl-v10.html"}})
 
 (deftask build []
   (comp (cljs)))
