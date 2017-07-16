@@ -8,9 +8,13 @@
   ([] (init false))
   ([reconnect?]
    ;; return duplex channel
-   (let [ch (ws/websocket {:uri             "ws://localhost:3000/ws"
-                           :auto-reconnect? reconnect?})]
+   (let [ch  (ws/websocket {:uri             "ws://localhost:3000/ws"
+                            :auto-reconnect? reconnect?})
+         pch (ws/listen! ch #(re-find #"1" %))]
      ;; write to channel => ws.send(msg)
+     (go
+       (println "let go.....")
+       (println "got from promise pch" (<! pch)))
      (go-loop [i 0]
        (<! (timeout 500))
        (when (>! ch (str "<div>line " i "</div>"))

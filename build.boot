@@ -13,7 +13,9 @@
 
                  [org.clojure/clojure        "1.9.0-alpha16" :scope "provide"]
                  [org.clojure/clojurescript  "1.9.562"       :scope "provide"]
-                 [org.clojure/core.async     "0.3.443"       :scope "provide"]])
+
+                 [org.clojure/core.async     "0.3.443"]
+                 [com.cognitect/transit-cljs "0.8.239"]])
 
 (require
  '[adzerk.boot-cljs      :refer [cljs]]
@@ -22,7 +24,7 @@
  '[pandeiro.boot-http    :refer [serve]]
  '[adzerk.bootlaces      :refer :all])
 
-(def +version+ "0.1.0")
+(def +version+ "0.1.1-SNAPSHOT")
 
 (bootlaces! +version+)
 
