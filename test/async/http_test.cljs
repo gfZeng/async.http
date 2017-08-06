@@ -1,6 +1,6 @@
-(ns async.ws-test
+(ns async.http-test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]])
-  (:require [async.ws    :as ws]
+  (:require [async.http         :as http]
             [clojure.core.async :as a :refer [take! put! <! timeout]]))
 
 
@@ -8,9 +8,9 @@
   ([] (init false))
   ([reconnect?]
    ;; return duplex channel
-   (let [ch  (ws/websocket {:uri             "ws://localhost:3000/ws"
+   (let [ch  (http/websocket {:uri             "ws://localhost:3000/ws"
                             :auto-reconnect? reconnect?})
-         pch (ws/listen! ch #(re-find #"1" %))]
+         pch (http/listen! ch #(re-find #"1" %))]
      ;; write to channel => ws.send(msg)
      (go
        (println "let go.....")
@@ -33,10 +33,10 @@
        ;; if `:auto-reconnect?` is `false`, the `ch` will be closed
        (<! (timeout 5000))
        (js/document.write "let us close websocket UNEXPECTED ...<br/>")
-       (.close (ws/chan-ws ch))
+       (.close (http/chan-ws ch))
        (<! (timeout 5000))
        (js/document.write "let us close websocket UNEXPECTED second time ...<br/>")
-       (.close (ws/chan-ws ch))
+       (.close (http/chan-ws ch))
        (<! (timeout 10000))
        (js/document.write "let us close websocket EXPECTED ...<br/>")
        (a/close! ch)))))

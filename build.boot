@@ -29,10 +29,10 @@
 (bootlaces! +version+)
 
 (task-options!
- pom  {:project 'async-ws
+ pom  {:project 'async.http
        :version +version+
-       :url     "https://github.com/gfZeng/time.clj"
-       :scm     {:url "https://github.com/gfZeng/time.clj"}
+       :url     "https://github.com/gfZeng/async.http"
+       :scm     {:url "https://github.com/gfZeng/async.http"}
        :license {"Eclipse Public License" "http://www.eclipse.org/legal/epl-v10.html"}})
 
 (deftask build []
@@ -50,7 +50,7 @@
   (task-options! cljs   {:optimizations :none}
                  serve  {:adapter 'aleph
                          :handler 'async.server/echo-handler}
-                 reload {:on-jsload 'async.ws-test/init})
+                 reload {:on-jsload 'async.http-test/init})
   identity)
 
 (deftask dev
