@@ -230,7 +230,8 @@
   ([url opts p]
    (fetch url opts p nil))
   ([url opts p ex-handler]
-   (let [body       (format-body (:body opts) opts)
+   (let [opts       (or opts {})
+         body       (format-body (:body opts) opts)
          format     (volatile! nil)
          p          (or p (a/promise-chan))
          ex-handler (or ex-handler js/console.error)]
@@ -272,8 +273,8 @@
                           (js->clj body)
 
                           body))))
-         (.catch (fn [e] (ex-handler e)))))
-   p))
+         (.catch (fn [e] (ex-handler e))))
+     p)))
 
 (defhttp GET POST PUT PATCH DELETE OPTION HEAD)
 
