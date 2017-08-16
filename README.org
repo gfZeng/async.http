@@ -5,7 +5,7 @@
 
 * Installation
   #+begin_src clojure
-  [async-ws "0.1.0"]
+  [async.http "0.1.0"]
   #+end_src
 
 
