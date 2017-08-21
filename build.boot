@@ -14,6 +14,9 @@
                  [org.clojure/clojure        "1.9.0-alpha16" :scope "provide"]
                  [org.clojure/clojurescript  "1.9.562"       :scope "provide"]
 
+                 [aleph "0.4.3"]
+                 [com.taoensso/timbre "4.10.0"]
+                 [org.clojure/data.json "0.2.6"]
                  [org.clojure/core.async     "0.3.443"]
                  [com.cognitect/transit-cljs "0.8.239"]])
 

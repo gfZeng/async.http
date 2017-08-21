@@ -1,4 +1,5 @@
-(ns async.http)
+(ns async.http
+  (:require [clojure.string :as str]))
 
 (defmacro defhttp [& ms]
   `(do
@@ -10,6 +11,11 @@
             ([url# opts# p#]
              (~m url# opts# p# nil))
             ([url# opts# p# ex-handler#]
-             (async.http/fetch
-              url# (merge {:method ~(name m)} opts#)
+             (fetch
+              url# (merge {:method ~(keyword
+                                     (str/lower-case
+                                      (name m)))}
+                          opts#)
               p# ex-handler#))))))
+
+#?(:clj (load "http-impl"))

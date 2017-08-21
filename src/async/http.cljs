@@ -234,9 +234,11 @@
          body       (format-body (:body opts) opts)
          format     (volatile! nil)
          p          (or p (a/promise-chan))
-         ex-handler (or ex-handler js/console.error)]
+         ex-handler (or ex-handler js/console.error)
+         method     (-> opts (:method :get) (name) (str/upper-case))]
      (-> (js/fetch url (doto (clj->js opts)
-                         (aset "body" body)))
+                         (aset "body" body)
+                         (aset "method" method)))
          (.then (fn [res]
                   (let [fmt (infer-format opts (.-headers res))]
                     (vreset! format fmt)
