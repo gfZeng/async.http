@@ -1,4 +1,4 @@
-(ns async.crypto)
+(ns tools.crypto)
 
 (def crypto (js/require "crypto"))
 

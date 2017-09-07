@@ -12,13 +12,13 @@
          '[byte-streams :as bs]
          '[clojure.edn :as edn]
          '[clojure.string :as str]
-         '[taoensso.timbre :refer [error]])
+         '[taoensso.timbre :refer [error warn]])
 
 (import [java.net URLEncoder URLDecoder])
 
 (defn default-exception-handler
   [e]
-  (error e))
+  (error e "uncaught exception"))
 
 (definline jsonstr->edn [s]
   `(json/read-str ~s :key-fn keyword :bigdec true))
@@ -77,7 +77,8 @@
           #(put! p (deserialize
                     (:body %)
                     (-> % :headers (header-val "content-type")))))
-         (d/catch' exh))
+         (d/catch' exh)
+         (d/catch' default-exception-handler))
      p)))
 
 (defhttp GET POST PUT PATCH DELETE OPTION HEAD)
@@ -140,21 +141,60 @@
                   (mult-forms 'mult*)))))
    read write pub mult))
 
+(defn websocket* [uri duplex opts]
+  (let [conn   (http/websocket-client uri)
+        mdata  (meta duplex)
+        sink   (:async/sink mdata)
+        source (:async/source mdata)]
+    (-> conn
+        (d/chain'
+         (fn [conn]
+           (reset! (:async/ws mdata) conn)
+           (when (:auto-reconnect? opts true)
+             (s/on-closed
+              conn (fn []
+                     (->> mdata :ws/listeners :close vals (run! #(%)))
+                     (when-not (or (impl/closed? sink) (impl/closed? source))
+                       (warn "websocket unexpected close:" uri)
+                       (websocket* uri duplex opts)))))
+           (s/connect conn (s/->sink sink) {:downstream? false})
+           (s/connect (s/->source source) conn)
+           (->> mdata :ws/listeners :open vals (run! #(%)))))
+        (d/catch' (:exception-handler opts default-exception-handler))
+        (d/catch' default-exception-handler))
+    duplex))
 
-(defn websocket [uri & {:keys [mult? pub?] :as spec}]
-  (let [conn   @(http/websocket-client uri)
-        sink   (or (:read/ch spec)  (chan 10))
+(defn websocket [uri & {:keys [mult? topic-fn] :as spec}]
+  (let [sink   (or (:read/ch spec)  (chan 10))
         source (or (:write/ch spec) (chan 10))
-        read   (when-not (or mult? pub?)
+        read   (when-not (or mult? topic-fn)
                  sink)
         mult   (when mult? (a/mult sink))
-        pub    (when pub?
+        pub    (when topic-fn
                  (if mult
-                   (a/pub (a/tap mult (a/chan 10)) :channel)
-                   (a/pub sink :channel)))]
-    (s/connect conn (s/->sink sink))
-    (s/connect (s/->source source) conn)
-    (with-meta
-      (hybrid :read read :write source :mult mult :pub pub)
-      {:aleph/ws conn})))
+                   (a/pub (a/tap mult (a/chan 10)) topic-fn)
+                   (a/pub sink topic-fn)))
+        duplex (hybrid :read read :write source :mult mult :pub pub)
+        duplex (vary-meta duplex assoc
+                          :async/ws (atom nil)
+                          :async/sink sink
+                          :async/source source
+                          :ws/listeners (atom {}))]
+    (websocket* uri duplex spec)))
 
+
+(defn listen! [ws type key fn]
+  (assert (#{:open :close} type))
+  (swap! (-> ws meta :ws/listeners) update type assoc key fn))
+
+(defn remove-listen!
+  ([ws type]
+   (swap! (-> ws meta :ws/listeners) dissoc type))
+  ([ws type key]
+   (swap! (-> ws meta :ws/listeners) update type dissoc key)))
+
+(defn on-open [ws key fn]
+  (listen! ws :open key fn))
+
+(defn on-close [ws key fn]
+  (listen! ws :open key fn))
