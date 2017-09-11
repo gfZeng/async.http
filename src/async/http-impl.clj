@@ -142,7 +142,7 @@
    read write pub mult))
 
 (defn websocket* [uri duplex opts]
-  (let [conn   (http/websocket-client uri)
+  (let [conn   (http/websocket-client uri opts)
         mdata  (meta duplex)
         sink   (:async/sink mdata)
         source (:async/source mdata)]
