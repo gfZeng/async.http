@@ -90,11 +90,10 @@
 (definline url-decode [s]
   `(URLDecoder/decode ~s "UTF-8"))
 
-(defn- channel-forms [& chs]
-  (let [chs (vec (remove nil? chs))]
-    `(impl/Channel
-      (~'close! [_] (run! impl/close! ~chs))
-      (~'closed? [_] (every? impl/closed? ~chs)))))
+(defn- channel-forms [chs]
+  `(impl/Channel
+    (~'close! [_] (run! impl/close! ~chs))
+    (~'closed? [_] (every? impl/closed? ~chs))))
 
 (defn- readport-forms [ch]
   `(impl/ReadPort
@@ -124,28 +123,31 @@
     (~'untap-all* [_]
      (a/untap-all* ~m))))
 
-(defn hybrid [& {:keys [read write pub mult]}]
-  ((eval `(fn ~'[read* write* pub* mult*]
-            (reify
-              ~@(if (or read write)
-                  (channel-forms
-                   (when read 'read*)
-                   (when write 'write*)))
-              ~@(if read
-                  (readport-forms 'read*))
-              ~@(if write
-                  (writeport-forms 'write*))
-              ~@(if pub
-                  (pub-forms 'pub*))
-              ~@(if mult
-                  (mult-forms 'mult*)))))
-   read write pub mult))
+(defn hybrid [& {:keys [read write pub mult channels]}]
+  (let [chs (cond->> channels
+              read  (cons read)
+              write (cons write)
+              true  (seq))]
+    ((eval `(fn ~'[read* write* pub* mult* chs*]
+              (reify
+                ~@(when chs
+                    (channel-forms 'chs*))
+                ~@(when read
+                    (readport-forms 'read*))
+                ~@(when write
+                    (writeport-forms 'write*))
+                ~@(when pub
+                    (pub-forms 'pub*))
+                ~@(when mult
+                    (mult-forms 'mult*)))))
+     read write pub mult (set chs))))
 
 (defn websocket* [uri duplex opts]
   (let [conn   (http/websocket-client uri opts)
         mdata  (meta duplex)
         sink   (:async/sink mdata)
-        source (:async/source mdata)]
+        source (:async/source mdata)
+        events (:ws/events mdata)]
     (-> conn
         (d/chain'
          (fn [conn]
@@ -153,13 +155,13 @@
            (when (:auto-reconnect? opts true)
              (s/on-closed
               conn (fn []
-                     (->> mdata :ws/listeners :close vals (run! #(%)))
+                     (a/put! events [:close conn])
                      (when-not (or (impl/closed? sink) (impl/closed? source))
                        (warn "websocket unexpected close:" uri)
                        (websocket* uri duplex opts)))))
            (s/connect conn (s/->sink sink) {:downstream? false})
            (s/connect (s/->source source) conn)
-           (->> mdata :ws/listeners :open vals (run! #(%)))))
+           (a/put! events [:open conn])))
         (d/catch' (:exception-handler opts default-exception-handler))
         (d/catch' default-exception-handler))
     duplex))
@@ -174,27 +176,58 @@
                  (if mult
                    (a/pub (a/tap mult (a/chan 10)) topic-fn)
                    (a/pub sink topic-fn)))
-        duplex (hybrid :read read :write source :mult mult :pub pub)
+        events (chan)
+        duplex (hybrid :read read :write source
+                       :mult mult :pub pub
+                       :channels [events])
         duplex (vary-meta duplex assoc
                           :async/ws (atom nil)
                           :async/sink sink
                           :async/source source
-                          :ws/listeners (atom {}))]
+                          :ws/events events)]
+    (go-loop [opens  {}
+              closes {}
+              conn   nil]
+      (when-some [[evt x] (<! events)]
+        (case evt
+          :open     (do
+                      (run! #(%) (vals opens))
+                      (recur opens closes x))
+          :close    (do
+                      (run! #(%) (vals closes))
+                      (recur opens closes nil))
+          :on-open  (do
+                      (when conn ((second x)))
+                      (recur (conj opens x) closes conn))
+          :on-close (recur opens (conj closes x) conn)
+
+          :remove/on-open
+          (if x
+            (recur (dissoc opens x) closes conn)
+            (recur {} closes conn))
+          :remove/on-close
+          (if x
+            (recur opens (dissoc closes x) conn)
+            (recur opens {} conn))
+          (do
+            (warn "unknow events")
+            (recur opens closes conn)))))
     (websocket* uri duplex spec)))
 
 
 (defn listen! [ws type key fn]
-  (assert (#{:open :close} type))
-  (swap! (-> ws meta :ws/listeners) update type assoc key fn))
+  (assert (#{:on-open :on-close} type) (pr-str type))
+  (a/put! (-> ws meta :ws/events) [type [key fn]]))
 
 (defn remove-listen!
   ([ws type]
-   (swap! (-> ws meta :ws/listeners) dissoc type))
+   (remove-listen! ws type nil))
   ([ws type key]
-   (swap! (-> ws meta :ws/listeners) update type dissoc key)))
+   (let [type (keyword "remove" (name type))]
+     (a/put! (-> ws meta :ws/events) [type key]))))
 
 (defn on-open [ws key fn]
-  (listen! ws :open key fn))
+  (listen! ws :on-open key fn))
 
 (defn on-close [ws key fn]
-  (listen! ws :open key fn))
+  (listen! ws :on-close key fn))
