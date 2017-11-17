@@ -146,7 +146,8 @@
   (let [conn   (http/websocket-client uri opts)
         mdata  (meta duplex)
         sink   (:async/sink mdata)
-        source (:async/source mdata)
+        mult   (:async/mult mdata)
+        source (a/tap mult (chan))
         events (:ws/events mdata)]
     (-> conn
         (d/chain'
@@ -160,7 +161,7 @@
                        (warn "websocket unexpected close:" uri)
                        (websocket* uri duplex opts)))))
            (s/connect conn (s/->sink sink) {:downstream? false})
-           (s/connect (s/->source source) conn)
+           (s/connect (s/->source source) conn {:upstream? true})
            (a/put! events [:open conn])))
         (d/catch' (:exception-handler opts default-exception-handler))
         (d/catch' default-exception-handler))
@@ -184,6 +185,7 @@
                           :async/ws (atom nil)
                           :async/sink sink
                           :async/source source
+                          :async/mult  (a/mult source)
                           :ws/events events)]
     (go-loop [opens  {}
               closes {}
