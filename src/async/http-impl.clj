@@ -53,7 +53,7 @@
     (condp re-find content-type
       #"transit" (throw (ex-info "not supported yet" {:request/format content-type}))
       #"edn"     (edn/read (io/reader body))
-      #"json"    (json/read (io/reader body) :key-fn keyword)
+      #"json"    (json/read (io/reader body) :key-fn keyword :bigdec true)
       body)))
 
 (defn fetch
