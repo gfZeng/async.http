@@ -1,6 +1,5 @@
 
 (in-ns 'async.http)
-
 (require '[clojure.core.async :as a
            :refer [put! chan go go-loop >! <!]]
          '[clojure.core.async.impl.protocols :as impl]
@@ -65,7 +64,9 @@
    (fetch url opts p nil))
   ([url opts p exh]
    (let [p    (or p (a/promise-chan))
-         exh  (or exh default-exception-handler)
+         dexh (fn [e]
+                (default-exception-handler e)
+                (a/close! p))
          opts (assoc opts
                      :url url
                      :request-method (:request-method opts :get)
@@ -77,8 +78,8 @@
           #(put! p (deserialize
                     (:body %)
                     (-> % :headers (header-val "content-type")))))
-         (d/catch' exh)
-         (d/catch' default-exception-handler))
+         (d/catch' (or exh dexh))
+         (d/catch' dexh))
      p)))
 
 (defhttp GET POST PUT PATCH DELETE OPTION HEAD)
@@ -148,7 +149,10 @@
         sink   (:async/sink mdata)
         mult   (:async/mult mdata)
         source (a/tap mult (chan))
-        events (:ws/events mdata)]
+        events (:ws/events mdata)
+        dexh   (fn [e]
+                 (default-exception-handler e)
+                 (a/close! duplex))]
     (-> conn
         (d/chain'
          (fn [conn]
@@ -163,8 +167,8 @@
            (s/connect conn (s/->sink sink) {:downstream? false})
            (s/connect (s/->source source) conn {:upstream? true})
            (a/put! events [:open conn])))
-        (d/catch' (:exception-handler opts default-exception-handler))
-        (d/catch' default-exception-handler))
+        (d/catch' (:exception-handler opts dexh))
+        (d/catch' dexh))
     duplex))
 
 (defn websocket [uri & {:keys [mult? topic-fn] :as spec}]
