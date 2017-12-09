@@ -1,14 +1,1 @@
-* WebSocket with [[https://github.com/clojure/core.async][core.async]]
-  - lightweight
-  - auto-reconnect?
-  - extend core.aysnc let channel support duplex
-
-* Installation
-  #+begin_src clojure
-  [async.http "0.1.3"]
-  #+end_src
-
-
-
-* Usage
-  See [[test/async/ws_test.cljs][example]]
+* Asynchronization http (and also WebSocket) over [[https://github.com/clojure/core.async][core.async]]
