@@ -4,11 +4,11 @@
            :refer [put! chan go go-loop >! <!]]
          '[clojure.core.async.impl.protocols :as impl]
          '[clojure.java.io :as io]
-         '[clojure.data.json :as json]
+         '[cheshire.core :as json]
+         '[cheshire.parse :as json-parse]
          '[aleph.http :as http]
          '[manifold.deferred :as d]
          '[manifold.stream :as s]
-         '[byte-streams :as bs]
          '[clojure.edn :as edn]
          '[clojure.string :as str]
          '[taoensso.timbre :refer [error warn]])
@@ -20,10 +20,11 @@
   (error e "uncaught exception"))
 
 (definline jsonstr->edn [s]
-  `(json/read-str ~s :key-fn keyword :bigdec true))
+  `(binding [json-parse/*use-bigdecimals?* true]
+     (json/parse-string ~s true)))
 
 (definline edn->jsonstr [s]
-  `(json/write-str ~s))
+  `(json/generate-string ~s))
 
 (defn header-val [headers k]
   (or (get headers k)
@@ -41,7 +42,7 @@
     (condp re-find content-type
       #"transit" (throw (ex-info "not supported yet" {:request/format content-type}))
       #"edn"     (pr-str body)
-      #"json"    (json/write-str body)
+      #"json"    (json/generate-string body)
       body)))
 
 (defn- deserialize [body content-type]
@@ -52,7 +53,8 @@
     (condp re-find content-type
       #"transit" (throw (ex-info "not supported yet" {:request/format content-type}))
       #"edn"     (edn/read (io/reader body))
-      #"json"    (json/read (io/reader body) :key-fn keyword :bigdec true)
+      #"json"    (binding [json-parse/*use-bigdecimals?* true]
+                   (json/parse-stream (io/reader body) true))
       body)))
 
 (defn fetch
@@ -72,7 +74,7 @@
                      :request-method (:request-method opts :get)
                      :body (serialize
                             (:body opts)
-                            (-> opts :headers (header-val "content-type"))))]
+                            (-> opts :headers (header-val "Content-Type"))))]
      (-> (http/request opts)
          (d/chain'
           #(put! p (deserialize
@@ -219,7 +221,6 @@
             (warn "unknow events")
             (recur opens closes conn)))))
     (websocket* uri duplex spec)))
-
 
 (defn listen! [ws type key fn]
   (assert (#{:on-open :on-close} type) (pr-str type))
