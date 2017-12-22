@@ -126,23 +126,30 @@
     (~'untap-all* [_]
      (a/untap-all* ~m))))
 
+(let [form-vals (atom {})]
+  (defn cached-eval [form]
+    (or (@form-vals form)
+        (get (swap! form-vals assoc form
+                    (eval form))
+             form))))
+
 (defn hybrid [& {:keys [read write pub mult channels]}]
   (let [chs (cond->> channels
               read  (cons read)
               write (cons write)
               true  (seq))]
-    ((eval `(fn ~'[read* write* pub* mult* chs*]
-              (reify
-                ~@(when chs
-                    (channel-forms 'chs*))
-                ~@(when read
-                    (readport-forms 'read*))
-                ~@(when write
-                    (writeport-forms 'write*))
-                ~@(when pub
-                    (pub-forms 'pub*))
-                ~@(when mult
-                    (mult-forms 'mult*)))))
+    ((cached-eval `(fn ~'[read* write* pub* mult* chs*]
+                     (reify
+                       ~@(when chs
+                           (channel-forms 'chs*))
+                       ~@(when read
+                           (readport-forms 'read*))
+                       ~@(when write
+                           (writeport-forms 'write*))
+                       ~@(when pub
+                           (pub-forms 'pub*))
+                       ~@(when mult
+                           (mult-forms 'mult*)))))
      read write pub mult (set chs))))
 
 (defn websocket* [uri duplex opts]
