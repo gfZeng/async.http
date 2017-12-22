@@ -152,7 +152,11 @@
                            (mult-forms 'mult*)))))
      read write pub mult (set chs))))
 
-(defn websocket* [uri duplex opts]
+(defmulti websocket*
+  (fn [uri duplex opts]
+    (:ws/transport opts)))
+
+(defmethod websocket* :default [uri duplex opts]
   (let [conn   (http/websocket-client uri opts)
         mdata  (meta duplex)
         sink   (:async/sink mdata)
@@ -179,6 +183,13 @@
         (d/catch' (:exception-handler opts dexh))
         (d/catch' dexh))
     duplex))
+
+(defn websocket0 [uri duplex opts]
+  (when-some [transport (:ws/transport opts)]
+    (let [ns (symbol (str "async.http.transport." (name transport)))]
+      (locking #'require
+        (require ns))))
+  (websocket* uri duplex opts))
 
 (defn websocket [uri & {:keys [mult? topic-fn] :as spec}]
   (let [sink   (or (:read/ch spec)  (chan 10))
@@ -227,7 +238,7 @@
           (do
             (warn "unknow events")
             (recur opens closes conn)))))
-    (websocket* uri duplex spec)))
+    (websocket0 uri duplex spec)))
 
 (defn listen! [ws type key fn]
   (assert (#{:on-open :on-close} type) (pr-str type))
