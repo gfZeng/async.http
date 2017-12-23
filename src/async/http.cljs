@@ -194,14 +194,16 @@
   ([url opts p]
    (fetch url opts p nil))
   ([url opts p ex-handler]
-   (let [opts       (or opts {})
-         body       (serialize (:body opts)
-                               (header-val (:headers opts)
-                                           "Content-Type"))
-         fmt        (volatile! nil)
-         p          (or p (a/promise-chan))
-         ex-handler (or ex-handler js/console.error)
-         method     (-> opts (:method :get) (name) (str/upper-case))]
+   (let [opts   (or opts {})
+         body   (serialize (:body opts)
+                           (header-val (:headers opts)
+                                       "Content-Type"))
+         fmt    (volatile! nil)
+         p      (or p (a/promise-chan))
+         dexh   (fn [e]
+                  (default-exception-handler e)
+                  (a/close! p))
+         method (-> opts (:method :get) (name) (str/upper-case))]
      (-> (js/fetch url (doto (clj->js opts)
                          (aset "body" body)
                          (aset "method" method)))
@@ -230,7 +232,8 @@
                           (js->clj body :keywordize-keys true)
 
                           body))))
-         (.catch (fn [e] (ex-handler e))))
+         (.catch (or ex-handler dexh))
+         (.catch dexh))
      p)))
 
 (defhttp GET POST PUT PATCH DELETE OPTION HEAD)
