@@ -6,7 +6,9 @@
             [cljs.core.async.impl.buffers   :as buffers]
             [cljs.reader :refer [read-string]]
             [clojure.string :as str]
-            [cognitect.transit :as t]))
+            [cognitect.transit :as t]
+            ["https" :as https]
+            ["http" :as http]))
 
 
 (defn default-exception-handler
@@ -186,6 +188,15 @@
 (defn infer-format [content-type]
   (re-find #"transit|edn|json|text" content-type))
 
+(let [agent-opts #js {:keepAlive      true
+                      :keepAliveMsecs 1500
+                      :maxSockets     16}]
+  (def http-agent
+    (http/Agent. agent-opts))
+
+  (def https-agent
+    (https/Agent. agent-opts)))
+
 (defn fetch
   ([url]
    (fetch url nil))
@@ -194,7 +205,11 @@
   ([url opts p]
    (fetch url opts p nil))
   ([url opts p ex-handler]
-   (let [opts   (or opts {})
+   (let [opts   (if (str/starts-with? url "https")
+                  (merge {:timeout 6e4
+                          :agent   https-agent} opts)
+                  (merge {:timeout 6e4
+                          :agent   http-agent} opts))
          body   (serialize (:body opts)
                            (header-val (:headers opts)
                                        "Content-Type"))
