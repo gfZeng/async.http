@@ -27,7 +27,7 @@
  '[pandeiro.boot-http    :refer [serve]]
  '[adzerk.bootlaces      :refer :all])
 
-(def +version+ "0.1.12")
+(def +version+ "0.1.13")
 
 (bootlaces! +version+)
 
