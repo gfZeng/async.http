@@ -77,9 +77,11 @@
                             (-> opts :headers (header-val "Content-Type"))))]
      (-> (http/request opts)
          (d/chain'
-          #(put! p (deserialize
-                    (:body %)
-                    (-> % :headers (header-val "content-type")))))
+          #(if-some [body (deserialize
+                           (:body %)
+                           (-> % :headers (header-val "content-type")))]
+             (put! p body)
+             (a/close! p)))
          (d/catch' (or exh dexh))
          (d/catch' dexh))
      p)))

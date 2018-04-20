@@ -235,18 +235,20 @@
 
                     res)))
          (.then (fn [body]
-                  (put! p
-                        (case @fmt
-                          "transit"
-                          (decode-transit body)
+                  (if body
+                    (put! p
+                          (case @fmt
+                            "transit"
+                            (decode-transit body)
 
-                          "edn"
-                          (read-string body)
+                            "edn"
+                            (read-string body)
 
-                          "json"
-                          (js->clj body :keywordize-keys true)
+                            "json"
+                            (js->clj body :keywordize-keys true)
 
-                          body))))
+                            body))
+                    (a/close! p))))
          (.catch (or ex-handler dexh))
          (.catch dexh))
      p)))
