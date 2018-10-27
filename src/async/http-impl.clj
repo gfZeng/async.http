@@ -72,9 +72,11 @@
          opts (assoc opts
                      :url url
                      :request-method (:request-method opts :get)
-                     :body (serialize
-                            (:body opts)
-                            (-> opts :headers (header-val "Content-Type"))))]
+                     :body (if (:raw-body? opts)
+                             (:body opts)
+                             (serialize
+                              (:body opts)
+                              (-> opts :headers (header-val "Content-Type")))))]
      (-> (http/request opts)
          (d/chain'
           #(if-some [body (deserialize
